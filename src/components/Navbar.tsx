@@ -1,16 +1,17 @@
 import { Search, Mic } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Navbar() {
   return (
     <nav className="fixed top-0 w-full h-[80px] bg-yellow-300 border-b-4 border-black flex justify-between items-center px-6 z-50">
       <div className="flex items-center gap-8">
-        <a href="/" className="text-3xl font-black text-black uppercase tracking-tighter shadow-[2px_2px_0px_0px_#fff]">
+        <Link to="/" className="text-3xl font-black text-black uppercase tracking-tighter shadow-[2px_2px_0px_0px_#fff]">
           Skill<span className="text-pink-500">Swap</span>
-        </a>
+        </Link>
         <ul className="hidden md:flex gap-6 text-black font-bold uppercase tracking-wide">
-          <li><a href="/" className="hover:underline decoration-4 decoration-pink-500 underline-offset-4">Explore</a></li>
-          <li><a href="/how-it-works" className="hover:underline decoration-4 decoration-pink-500 underline-offset-4">How it Works</a></li>
-          <li><a href="/faq" className="hover:underline decoration-4 decoration-pink-500 underline-offset-4">FAQ</a></li>
+          <li><Link to="/" className="hover:underline decoration-4 decoration-pink-500 underline-offset-4">Explore</Link></li>
+          <li><Link to="/how-it-works" className="hover:underline decoration-4 decoration-pink-500 underline-offset-4">How it Works</Link></li>
+          <li><Link to="/faq" className="hover:underline decoration-4 decoration-pink-500 underline-offset-4">FAQ</Link></li>
         </ul>
       </div>
 
@@ -25,10 +26,21 @@ export default function Navbar() {
         </div>
 
         <div className="flex gap-4 items-center">
-          <a href="/login" className="text-black font-black uppercase text-sm hover:-translate-y-1 transition-transform">Sign In</a>
-          <a href="/signup" className="bg-pink-500 text-black border-4 border-black px-6 py-2 font-black uppercase text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all">
+          {/* Matches the Login Page Background */}
+          <Link 
+            to="/login" 
+            className="bg-yellow-300 text-black border-4 border-black px-6 py-2 font-black uppercase text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
+          >
+            Sign In
+          </Link>
+          
+          {/* Matches the Signup Page Background */}
+          <Link 
+            to="/signup" 
+            className="bg-pink-400 text-white border-4 border-black px-6 py-2 font-black uppercase text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
+          >
             Join Now
-          </a>
+          </Link>
         </div>
       </div>
     </nav>
