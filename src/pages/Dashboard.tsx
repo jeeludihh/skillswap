@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
-import { Coins, Zap, MessageSquare, Loader2, Plus } from 'lucide-react';
+import { Coins, Zap, MessageSquare, Plus } from 'lucide-react';
 import BrutalistBackground from '../components/BrutalistBackground';
 import PostSkillModal from '../components/PostSkillModal';
 import BrutalToast from '../components/BrutalToast';

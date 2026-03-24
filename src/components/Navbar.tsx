@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { User, LogOut, Search, Mic } from 'lucide-react';
+import { User, LogOut, Mic } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
