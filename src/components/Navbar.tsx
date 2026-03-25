@@ -43,9 +43,9 @@ export default function Navbar() {
 
     const channel = supabase
       .channel('realtime_notifications')
-      .on('postgres_changes', 
+      .on('postgres_changes',
         // We removed the strict filter so it catches deletes/reads perfectly
-        { event: '*', schema: 'public', table: 'notifications' }, 
+        { event: '*', schema: 'public', table: 'notifications' },
         () => {
           fetchUnreadCount(user.id);
         }
@@ -60,7 +60,7 @@ export default function Navbar() {
     const handleUpdate = () => {
       if (user) fetchUnreadCount(user.id);
     };
-    
+
     window.addEventListener('notifications-updated', handleUpdate);
     return () => window.removeEventListener('notifications-updated', handleUpdate);
   }, [user]);
@@ -86,7 +86,7 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 w-full h-[80px] bg-yellow-300 border-b-4 border-black flex justify-between items-center px-6 z-50 shadow-[0px_4px_0px_0px_rgba(0,0,0,1)]">
-      {/* LEFT: LOGO */}
+      {/* LEFT: LOGO & LINKS */}
       <div className="flex items-center gap-8">
         <Link to="/" className="group">
           <div className="bg-black text-white px-4 py-2 border-4 border-black shadow-[4px_4px_0px_0px_#ec4899] group-hover:translate-x-[2px] group-hover:translate-y-[2px] group-hover:shadow-none transition-all">
@@ -95,8 +95,12 @@ export default function Navbar() {
             </span>
           </div>
         </Link>
+
+        {/* THE NEW NAV LINKS */}
         <ul className="hidden md:flex gap-6 font-black uppercase italic text-sm">
-          <li><Link to="/marketplace" className="hover:text-pink-600 transition-colors">The Grid</Link></li>
+          <li><Link to="/marketplace" className="smooth-hover">The Grid</Link></li>
+          <li><Link to="/how-it-works" className="smooth-hover">How It Works</Link></li>
+          <li><Link to="/faq" className="smooth-hover">FAQ</Link></li>
         </ul>
       </div>
 

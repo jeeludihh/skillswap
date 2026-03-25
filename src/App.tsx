@@ -8,6 +8,8 @@ import Dashboard from './pages/Dashboard';
 import Inbox from './pages/Inbox';
 import Activity from './pages/Activity';
 import Chat from './pages/Chat';
+import HowItWorks from './pages/HowItWorks';
+import Faq from './pages/Faq';
 
 function App() {
   return (
@@ -23,6 +25,8 @@ function App() {
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/activity" element={<Activity />} />
           <Route path="/chat/:requestId" element={<Chat />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/faq" element={<Faq />} />
         </Routes>
       </div>
     </Router>

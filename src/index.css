@@ -18,3 +18,45 @@
     transform: translate3d(0, 0, 0) scale(1); 
   }
 }
+
+/* INFINITE MARQUEE ANIMATION */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: 200%; /* Needs to be double width to scroll smoothly */
+  animation: marquee 15s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused; /* Optional: Pauses when they hover over it */
+}
+
+/* SMOOTH NEO-BRUTALIST HOVER UNDERLINE */
+.smooth-hover {
+  position: relative;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.smooth-hover::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  transform: scaleX(0);
+  height: 3px; /* Reduced thickness */
+  bottom: -4px;
+  left: 0;
+  background-color: #ec4899; /* Pink underline */
+  transform-origin: bottom right;
+  transition: transform 0.3s cubic-bezier(0.65, 0, 0.35, 1);
+  /* Border removed entirely */
+}
+
+.smooth-hover:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}

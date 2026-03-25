@@ -57,10 +57,13 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Decorative Bottom Marquee (Optional but fits the vibe) */}
-      <div className="fixed bottom-0 w-full bg-black py-2 overflow-hidden whitespace-nowrap border-t-4 border-black hidden md:block z-50">
-        <div className="animate-marquee inline-block text-white font-black uppercase text-sm tracking-widest">
-          * JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP *
+      {/* Decorative Bottom Marquee */}
+      <div className="fixed bottom-0 left-0 w-full bg-black py-2 overflow-hidden whitespace-nowrap border-t-4 border-black hidden md:block z-50">
+        <div className="animate-marquee flex items-center text-white font-black uppercase text-sm tracking-widest">
+          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP *</span>
+          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP *</span>
+          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP *</span>
+          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP *</span>
         </div>
       </div>
     </div>
