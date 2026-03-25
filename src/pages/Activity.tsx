@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Bell, CheckCircle2, XCircle, Zap, Clock, ArrowRight, Trash2 } from 'lucide-react';
+import { Bell, CheckCircle2, XCircle, Zap, Trash2 } from 'lucide-react';
 import BrutalistBackground from '../components/BrutalistBackground';
 
 export default function Activity() {
