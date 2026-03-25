@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Zap, Clock, User, ArrowRight } from 'lucide-react';
+import { Zap, Clock, User, ArrowRight, Star } from 'lucide-react';
 import BrutalistBackground from '../components/BrutalistBackground';
 import BrutalToast from '../components/BrutalToast';
 
@@ -18,7 +18,8 @@ export default function Marketplace() {
       setLoading(true);
       const { data, error } = await supabase
         .from('swaps')
-        .select(`*, profiles:user_id (full_name)`)
+        // UPDATED: Now grabbing avg_rating and rating_count
+        .select(`*, profiles:user_id (full_name, avg_rating, rating_count)`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -33,53 +34,21 @@ export default function Marketplace() {
   const handleRequest = async (skill: any) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setToast({ show: true, msg: "LOG IN TO SWAP!", type: 'error' });
-        return;
-      }
+      if (!user) { setToast({ show: true, msg: "LOG IN TO SWAP!", type: 'error' }); return; }
+      if (user.id === skill.user_id) { setToast({ show: true, msg: "CAN'T SWAP WITH YOURSELF!", type: 'error' }); return; }
 
-      // Prevent Self-Swapping
-      if (user.id === skill.user_id) {
-        setToast({ show: true, msg: "YOU CAN'T SWAP WITH YOURSELF!", type: 'error' });
-        return;
-      }
-
-      // 1. Insert the Pending Request
-      const { error: reqError } = await supabase
-        .from('requests')
-        .insert([{
-          skill_id: skill.id,
-          requester_id: user.id,
-          receiver_id: skill.user_id,
-          status: 'pending'
-        }]);
-
+      const { error: reqError } = await supabase.from('requests').insert([{ skill_id: skill.id, requester_id: user.id, receiver_id: skill.user_id, status: 'pending' }]);
       if (reqError) {
-        if (reqError.code === '23505') throw new Error("YOU ALREADY REQUESTED THIS!");
+        if (reqError.code === '23505') throw new Error("ALREADY REQUESTED!");
         throw reqError;
       }
 
-      // 2. Fetch Sender's Name for the Notification
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-        
-      const senderName = profile?.full_name?.split(' ')[0] || 'A GRID USER';
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+      const senderName = profile?.full_name?.split(' ')[0] || 'A USER';
 
-      // 3. Fire Custom Notification to the Skill Owner
-      const { error: notifError } = await supabase.from('notifications').insert([{
-        user_id: skill.user_id,
-        message: `${senderName.toUpperCase()} WANTS YOUR SKILL: ${skill.title.toUpperCase()}`,
-        type: 'request'
-      }]);
-
-      if (notifError) console.error("NOTIFICATION FAILED:", notifError);
-
+      await supabase.from('notifications').insert([{ user_id: skill.user_id, message: `${senderName.toUpperCase()} WANTS: ${skill.title.toUpperCase()}`, type: 'request' }]);
       setToast({ show: true, msg: "REQUEST SENT TO THE GRID!", type: 'success' });
     } catch (err: any) {
-      console.error("REQUEST ERROR:", err);
       setToast({ show: true, msg: err.message || "ERROR SENDING REQUEST!", type: 'error' });
     }
   };
@@ -127,13 +96,22 @@ export default function Marketplace() {
                 </div>
 
                 <div className="pt-6 border-t-4 border-black border-dashed flex items-center justify-between mt-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-black text-white border-2 border-black rounded-full flex items-center justify-center">
-                      <User size={14} />
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-black text-white border-2 border-black rounded-full flex items-center justify-center">
+                        <User size={12} />
+                      </div>
+                      <span className="text-xs uppercase tracking-tighter font-black">
+                        {skill.profiles?.full_name?.split(' ')[0]}
+                      </span>
                     </div>
-                    <span className="text-xs uppercase tracking-tighter font-black">
-                      {skill.profiles?.full_name?.split(' ')[0]}
-                    </span>
+                    {/* NEW: STAR RATING BADGE */}
+                    <div className="flex items-center gap-1 text-[10px] uppercase font-black bg-gray-100 border-2 border-black px-1.5 py-0.5 w-max mt-1">
+                      <Star size={10} className="fill-yellow-400 text-yellow-400" /> 
+                      {skill.profiles?.rating_count > 0 
+                        ? `${skill.profiles?.avg_rating} (${skill.profiles?.rating_count})` 
+                        : 'NEW USER'}
+                    </div>
                   </div>
                   <button 
                     onClick={() => handleRequest(skill)}

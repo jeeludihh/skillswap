@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, Send, Zap } from 'lucide-react';
+import { ArrowLeft, Send, Zap, Star } from 'lucide-react';
 import BrutalistBackground from '../components/BrutalistBackground';
 
 export default function Chat() {
@@ -12,13 +12,17 @@ export default function Chat() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // RATING STATE
+  const [myRating, setMyRating] = useState(0);
+  const [targetUserId, setTargetUserId] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setupChat();
   }, [requestId]);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -30,43 +34,35 @@ export default function Chat() {
       if (!currentUser) return navigate('/');
       setUser(currentUser);
 
-      // 1. Get Request Details
       const { data: reqData, error: reqError } = await supabase
         .from('requests')
-        .select(`
-          id, requester_id, receiver_id, status,
-          swaps!fk_requests_swaps (title),
-          sender:requester_id (full_name),
-          receiver:receiver_id (full_name)
-        `)
+        .select(`id, requester_id, receiver_id, status, swaps!fk_requests_swaps (title), sender:requester_id (full_name), receiver:receiver_id (full_name)`)
         .eq('id', requestId)
         .single();
 
       if (reqError || reqData.status !== 'accepted') throw new Error("Invalid chat room.");
       setRequestDetails(reqData);
 
-      // 2. Load History
-      const { data: msgData } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('request_id', requestId)
-        .order('created_at', { ascending: true });
-      
+      // Determine who you are talking to
+      const targetId = currentUser.id === reqData.requester_id ? reqData.receiver_id : reqData.requester_id;
+      setTargetUserId(targetId);
+
+      // FETCH EXISTING RATING (If you already rated them)
+      const { data: reviewData } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('reviewer_id', currentUser.id)
+        .eq('reviewee_id', targetId)
+        .single();
+      if (reviewData) setMyRating(reviewData.rating);
+
+      const { data: msgData } = await supabase.from('messages').select('*').eq('request_id', requestId).order('created_at', { ascending: true });
       setMessages(msgData || []);
 
-      // 3. BULLETPROOF REALTIME LISTENER
-      const channel = supabase
-        .channel('public:messages')
-        .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'messages' }, 
-          (payload) => {
-            // Filter it perfectly on the frontend
-            if (payload.new.request_id.toString() === requestId) {
-              setMessages(prev => [...prev, payload.new]);
-            }
-          }
-        )
-        .subscribe();
+      const channel = supabase.channel('public:messages')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+          if (payload.new.request_id.toString() === requestId) setMessages(prev => [...prev, payload.new]);
+        }).subscribe();
 
       return () => { supabase.removeChannel(channel); };
     } catch (err) {
@@ -79,23 +75,32 @@ export default function Chat() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !requestDetails) return;
-
-    const targetUserId = user.id === requestDetails.requester_id 
-      ? requestDetails.receiver_id 
-      : requestDetails.requester_id;
+    if (!newMessage.trim() || !user || !targetUserId) return;
 
     const msgContent = newMessage;
-    setNewMessage(''); // Instant UI clear
+    setNewMessage(''); 
 
-    const { error } = await supabase.from('messages').insert([{
-      request_id: requestId,
-      sender_id: user.id,
-      receiver_id: targetUserId,
-      content: msgContent
-    }]);
+    await supabase.from('messages').insert([{ request_id: requestId, sender_id: user.id, receiver_id: targetUserId, content: msgContent }]);
+  };
 
-    if (error) console.error("Failed to send:", error);
+  // THE RATING FUNCTION
+  const handleRate = async (stars: number) => {
+    if (!user || !targetUserId) return;
+    
+    // Optimistic UI update
+    setMyRating(stars); 
+
+    // UPSERT the review (Insert or Update if exists)
+    const { error } = await supabase.from('reviews').upsert({
+      reviewer_id: user.id,
+      reviewee_id: targetUserId,
+      rating: stars
+    });
+
+    if (error) {
+      console.error("Rating Error:", error);
+      alert("Failed to submit rating.");
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center font-black text-4xl uppercase">Connecting...</div>;
@@ -106,19 +111,37 @@ export default function Chat() {
   return (
     <div className="min-h-screen bg-white pt-24 pb-0 px-4 sm:px-6 relative overflow-hidden text-black font-black flex flex-col">
       <BrutalistBackground />
-      <div className="max-w-3xl mx-auto relative z-10 flex flex-col h-[calc(100vh-100px)] w-full border-8 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-white">
+      <div className="max-w-4xl mx-auto relative z-10 flex flex-col h-[calc(100vh-100px)] w-full border-8 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-white">
         
-        <header className="bg-lime-400 border-b-8 border-black p-4 md:p-6 flex items-center gap-4 shrink-0">
-          <button onClick={() => navigate('/inbox')} className="bg-white border-4 border-black p-2 hover:bg-pink-500 hover:text-white transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]">
-            <ArrowLeft size={24} strokeWidth={3} />
-          </button>
-          <div>
-            <h1 className="text-2xl md:text-4xl uppercase tracking-tighter leading-none mb-1">
-              CHAT // {partnerName?.split(' ')[0]}
-            </h1>
-            <span className="bg-black text-white px-2 py-0.5 text-xs uppercase tracking-widest inline-flex items-center gap-2">
-              <Zap size={12} className="text-yellow-300 fill-current" /> {requestDetails.swaps?.title}
-            </span>
+        {/* CHAT HEADER WITH RATING WIDGET */}
+        <header className="bg-lime-400 border-b-8 border-black p-4 flex flex-col md:flex-row justify-between md:items-center gap-4 shrink-0">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate('/dashboard')} className="bg-white border-4 border-black p-2 hover:bg-pink-500 hover:text-white transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]">
+              <ArrowLeft size={24} strokeWidth={3} />
+            </button>
+            <div>
+              <h1 className="text-xl md:text-3xl uppercase tracking-tighter leading-none mb-1">
+                CHAT // {partnerName?.split(' ')[0]}
+              </h1>
+              <span className="bg-black text-white px-2 py-0.5 text-[10px] md:text-xs uppercase tracking-widest inline-flex items-center gap-2">
+                <Zap size={10} className="text-yellow-300 fill-current" /> {requestDetails.swaps?.title}
+              </span>
+            </div>
+          </div>
+
+          {/* THE STAR RATING COMPONENT */}
+          <div className="bg-white border-4 border-black p-2 flex flex-col items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <span className="text-[10px] uppercase font-black tracking-widest mb-1">Rate Partner</span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star 
+                  key={star} 
+                  size={24} 
+                  onClick={() => handleRate(star)}
+                  className={`cursor-pointer transition-all hover:scale-110 ${myRating >= star ? 'fill-yellow-400 text-black' : 'text-gray-300'}`} 
+                />
+              ))}
+            </div>
           </div>
         </header>
 
