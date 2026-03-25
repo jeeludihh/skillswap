@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Check, X, ArrowUpRight, ArrowDownLeft, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import BrutalistBackground from '../components/BrutalistBackground';
 import BrutalToast from '../components/BrutalToast';
 
@@ -9,6 +10,7 @@ export default function Inbox() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchRequests();
@@ -28,10 +30,9 @@ export default function Inbox() {
         `);
 
       if (activeTab === 'incoming') {
-        // INCOMING: Only show pending requests that need your action
-        query = query.eq('receiver_id', user.id).eq('status', 'pending');
+        // Show ALL incoming requests so you can access chat history later
+        query = query.eq('receiver_id', user.id);
       } else {
-        // OUTGOING: Show everything you sent so you can track the status
         query = query.eq('requester_id', user.id);
       }
 
@@ -68,23 +69,18 @@ export default function Inbox() {
         if (updateError) throw updateError;
       }
 
-      // 2. Fetch Your Name for the Notification
+      // 2. Fire Custom Notification back to Requester
       const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
       const myName = profile?.full_name?.split(' ')[0] || 'THE PROVIDER';
       const actionText = newStatus === 'accepted' ? 'ACCEPTED' : 'DECLINED';
 
-      // 3. Fire Custom Notification back to the Requester
-      const { error: notifError } = await supabase.from('notifications').insert([{
+      await supabase.from('notifications').insert([{
         user_id: req.requester_id,
         message: `${myName.toUpperCase()} ${actionText} YOUR REQUEST FOR: ${req.swaps?.title.toUpperCase()}`,
         type: newStatus === 'accepted' ? 'accept' : 'decline'
       }]);
 
-      if (notifError) console.error("NOTIFICATION FAILED:", notifError);
-
       setToast({ show: true, msg: `SWAP ${newStatus.toUpperCase()}!`, type: 'success' });
-      
-      // Refresh the list immediately to remove the card from 'Incoming'
       fetchRequests(); 
       
     } catch (err: any) {
@@ -103,13 +99,12 @@ export default function Inbox() {
           SWAP <span className="text-blue-600 italic">CENTER</span>
         </h1>
 
-        {/* TAB NAVIGATION */}
         <div className="flex flex-col md:flex-row gap-4 mb-12">
           <button 
             onClick={() => setActiveTab('incoming')} 
             className={`flex-1 py-4 border-4 border-black font-black uppercase text-xl flex items-center justify-center gap-2 transition-all ${activeTab === 'incoming' ? 'bg-yellow-300 translate-x-1 translate-y-1 shadow-none' : 'bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:bg-gray-50'}`}
           >
-            <ArrowDownLeft size={28} /> Action Required
+            <ArrowDownLeft size={28} /> Incoming
           </button>
           <button 
             onClick={() => setActiveTab('outgoing')} 
@@ -119,13 +114,12 @@ export default function Inbox() {
           </button>
         </div>
 
-        {/* REQUEST LIST */}
         {loading ? (
           <div className="text-3xl animate-pulse uppercase tracking-widest text-center py-12">Reading Data...</div>
         ) : requests.length === 0 ? (
           <div className="border-8 border-black border-dashed p-16 text-center bg-gray-50 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)]">
             <p className="text-3xl font-black text-gray-300 uppercase italic">
-              {activeTab === 'incoming' ? "No pending requests." : "You haven't requested any skills."}
+              {activeTab === 'incoming' ? "No incoming requests." : "You haven't requested any skills."}
             </p>
           </div>
         ) : (
@@ -134,14 +128,24 @@ export default function Inbox() {
               <div key={req.id} className="bg-white border-8 border-black p-6 md:p-8 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-brutal-in relative group transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
                 
                 <div className="flex-1">
-                  {/* STATUS BADGE FOR OUTGOING */}
-                  {activeTab === 'outgoing' && (
-                    <div className="mb-4">
-                      {req.status === 'accepted' && <span className="bg-lime-400 border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"><CheckCircle2 size={16}/> ACCEPTED</span>}
-                      {req.status === 'declined' && <span className="bg-red-400 text-white border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"><XCircle size={16}/> DECLINED</span>}
-                      {req.status === 'pending' && <span className="bg-yellow-300 border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"><Clock size={16}/> PENDING</span>}
-                    </div>
-                  )}
+                  <div className="mb-4 flex items-center gap-4 flex-wrap">
+                    {/* STATUS BADGES & CHAT BUTTON */}
+                    {req.status === 'accepted' && (
+                      <>
+                        <span className="bg-lime-400 border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                          <CheckCircle2 size={16}/> ACCEPTED
+                        </span>
+                        <button 
+                          onClick={() => navigate(`/chat/${req.id}`)}
+                          className="bg-black text-white px-4 py-1 border-4 border-black text-sm font-black uppercase shadow-[2px_2px_0px_0px_#ec4899] hover:bg-pink-500 hover:text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+                        >
+                          CHAT &rarr;
+                        </button>
+                      </>
+                    )}
+                    {req.status === 'declined' && <span className="bg-red-400 text-white border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"><XCircle size={16}/> DECLINED</span>}
+                    {req.status === 'pending' && <span className="bg-yellow-300 border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"><Clock size={16}/> PENDING</span>}
+                  </div>
 
                   <h3 className="text-3xl md:text-4xl font-black uppercase leading-[0.9] mb-2">
                     {activeTab === 'incoming' ? req.sender?.full_name?.split(' ')[0] : `Target: ${req.receiver?.full_name?.split(' ')[0]}`}
