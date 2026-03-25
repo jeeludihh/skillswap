@@ -1,13 +1,49 @@
 import { MapPin, Zap, Flame } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import BrutalistBackground from '../components/BrutalistBackground';
 
 export default function Home() {
+  const navigate = useNavigate();
+
+  // THE LOCATION RADAR FUNCTION
+  const handleFindNearMe = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      alert("YOU MUST BE LOGGED IN TO USE THE LOCAL RADAR.");
+      navigate('/login');
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      alert("Your device doesn't support geolocation.");
+      navigate('/marketplace');
+      return;
+    }
+
+    // Ask for browser GPS permission
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const { latitude, longitude } = position.coords;
+      
+      // Save location to their profile (Now permitted by SQL!)
+      const { error } = await supabase.from('profiles').update({ lat: latitude, lng: longitude }).eq('id', user.id);
+      if (error) console.error("DB Save Error:", error);
+      
+      // INSTANT PASS: Send coordinates directly to the marketplace URL
+      navigate(`/marketplace?local=true&lat=${latitude}&lng=${longitude}`);
+    }, (error) => {
+      console.error(error);
+      alert("Location access denied! Showing global grid instead.");
+      navigate('/marketplace');
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-white relative overflow-hidden flex flex-col items-center">
+    <div className="min-h-screen bg-white relative overflow-hidden flex flex-col items-center justify-between">
       <BrutalistBackground />
       
-      <header className="pt-40 pb-20 px-5 text-center max-w-4xl mx-auto flex flex-col items-center relative z-10 animate-brutal-in">
+      <header className="flex-1 flex flex-col items-center justify-center pt-32 pb-20 px-5 text-center max-w-4xl mx-auto relative z-10 animate-brutal-in">
         {/* Version Badge */}
         <div className="bg-white border-4 border-black text-black px-4 py-1 font-black uppercase tracking-widest mb-8 shadow-[4px_4px_0px_0px_#ff00ff] transform -rotate-2">
           V 1.0 // Beta Is For Cowards
@@ -26,15 +62,15 @@ export default function Home() {
           A hyper-local marketplace for broke students. Swap Python lessons for guitar chords or moving help. Stop paying for stuff!
         </p>
         
-        {/* Secondary Action */}
-        <div className="mb-12">
-          <Link 
-            to="/marketplace"
-            className="bg-white border-4 border-black px-6 py-3 font-black uppercase flex items-center gap-2 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
+        {/* THE RADAR BUTTON */}
+        <div className="mb-12 w-full">
+          <button 
+            onClick={handleFindNearMe}
+            className="bg-white border-8 border-black px-6 py-4 font-black uppercase flex items-center justify-center gap-4 mx-auto text-xl md:text-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none hover:bg-black hover:text-white transition-all group w-full md:w-auto"
           >
-            <MapPin className="text-pink-500 w-6 h-6" />
+            <MapPin className="text-pink-500 w-8 h-8 group-hover:text-yellow-400 transition-colors" />
             <span>Find Swappers Near Me</span>
-          </Link>
+          </button>
         </div>
         
         {/* Primary CTA Buttons */}
@@ -58,12 +94,12 @@ export default function Home() {
       </header>
 
       {/* Decorative Bottom Marquee */}
-      <div className="fixed bottom-0 left-0 w-full bg-black py-2 overflow-hidden whitespace-nowrap border-t-4 border-black hidden md:block z-50">
-        <div className="animate-marquee flex items-center text-white font-black uppercase text-sm tracking-widest">
-          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP *</span>
-          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP *</span>
-          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP *</span>
-          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP *</span>
+      <div className="w-full bg-black py-3 overflow-hidden whitespace-nowrap border-t-8 border-black z-50 mt-auto">
+        <div className="animate-marquee flex items-center text-white font-black uppercase md:text-xl tracking-widest">
+          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS *</span>
+          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS *</span>
+          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS *</span>
+          <span className="mx-4">* JOIN THE GRID * NO CASH REQUIRED * TRADE YOUR SKILLS * 3 FREE CREDITS ON SIGNUP * TRADE YOUR SKILLS *</span>
         </div>
       </div>
     </div>

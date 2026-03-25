@@ -1,29 +1,95 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Zap, Clock, User, ArrowRight, Star } from 'lucide-react';
+import { Zap, Clock, User, ArrowRight, Star, MapPin } from 'lucide-react';
 import BrutalistBackground from '../components/BrutalistBackground';
 import BrutalToast from '../components/BrutalToast';
+
+// MATH: Haversine formula to calculate distance in Kilometers
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity; // If someone is missing coords, return infinity
+  const R = 6371; 
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return R * c; 
+}
 
 export default function Marketplace() {
   const [skills, setSkills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
+  const [localMode, setLocalMode] = useState(false);
+  
+  const location = useLocation();
 
   useEffect(() => {
-    fetchSkills();
-  }, []);
+    // 1. Extract exact params from the URL
+    const params = new URLSearchParams(location.search);
+    const isLocalUrl = params.get('local') === 'true';
+    const searchQuery = params.get('q');
+    
+    // Grab GPS from URL if it exists
+    const urlLat = params.get('lat') ? parseFloat(params.get('lat')!) : null;
+    const urlLng = params.get('lng') ? parseFloat(params.get('lng')!) : null;
 
-  async function fetchSkills() {
+    setLocalMode(isLocalUrl);
+    fetchSkills(isLocalUrl, searchQuery, urlLat, urlLng);
+  }, [location.search]);
+
+  async function fetchSkills(isLocal: boolean, queryText: string | null, urlLat: number | null, urlLng: number | null) {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      let currentUserLat = urlLat;
+      let currentUserLng = urlLng;
+
+      // Fallback: If no coords in URL but local mode is on, grab from DB
+      if (isLocal && (!currentUserLat || !currentUserLng)) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase.from('profiles').select('lat, lng').eq('id', user.id).single();
+          if (profile?.lat && profile?.lng) {
+            currentUserLat = profile.lat;
+            currentUserLng = profile.lng;
+          }
+        }
+      }
+
+      // START DATABASE QUERY
+      let dbQuery = supabase
         .from('swaps')
-        // UPDATED: Now grabbing avg_rating and rating_count
-        .select(`*, profiles:user_id (full_name, avg_rating, rating_count)`)
+        .select(`*, profiles:user_id (full_name, avg_rating, rating_count, lat, lng)`)
         .order('created_at', { ascending: false });
 
+      if (queryText) {
+        dbQuery = dbQuery.or(`title.ilike.%${queryText}%,category.ilike.%${queryText}%,description.ilike.%${queryText}%`);
+      }
+
+      const { data, error } = await dbQuery;
       if (error) throw error;
-      setSkills(data || []);
+      
+      let fetchedSkills = data || [];
+
+      // THE ENFORCER: Filter by distance if Local Mode is activated
+      if (isLocal && currentUserLat && currentUserLng) {
+        fetchedSkills = fetchedSkills.map(skill => {
+          const distance = calculateDistance(
+            currentUserLat!, currentUserLng!, 
+            skill.profiles.lat, skill.profiles.lng
+          );
+          return { ...skill, distance };
+        })
+        .filter(skill => skill.distance !== Infinity && skill.distance <= 50) // ONLY within 50km
+        .sort((a, b) => a.distance - b.distance); // Closest first
+      } else if (isLocal && (!currentUserLat || !currentUserLng)) {
+         // Failsafe: If Local is turned on but we STILL don't have coords, clear the grid.
+         fetchedSkills = [];
+      }
+
+      setSkills(fetchedSkills);
     } catch (err) {
       console.error("Fetch Skills Error:", err);
     } finally {
@@ -59,20 +125,31 @@ export default function Marketplace() {
       {toast.show && <BrutalToast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
 
       <div className="max-w-7xl mx-auto relative z-10">
-        <header className="mb-12">
-          <h1 className="text-7xl md:text-8xl font-black uppercase tracking-tighter mb-4 leading-none flex items-center gap-4">
-            THE <span className="text-pink-500 italic">GRID</span> <Zap size={64} className="text-yellow-400 fill-current" />
-          </h1>
-          <p className="text-xl bg-black text-white inline-block px-4 py-1 uppercase italic shadow-[4px_4px_0px_0px_#ec4899]">
-            Available Skills for Swap
-          </p>
+        <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <h1 className="text-7xl md:text-8xl font-black uppercase tracking-tighter mb-4 leading-none flex items-center gap-4">
+              THE <span className="text-pink-500 italic">GRID</span> <Zap size={64} className="text-yellow-400 fill-current" />
+            </h1>
+            <p className="text-xl bg-black text-white inline-block px-4 py-1 uppercase italic shadow-[4px_4px_0px_0px_#ec4899]">
+              {localMode ? "FILTERED: SWAPPERS WITHIN 50 KM" : "GLOBAL GRID: ALL SKILLS"}
+            </p>
+          </div>
+          
+          <button 
+            onClick={() => window.location.href = localMode ? '/marketplace' : '/'}
+            className={`border-4 border-black px-6 py-3 font-black uppercase flex items-center gap-2 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none ${localMode ? 'bg-red-500 text-white' : 'bg-lime-400 text-black'}`}
+          >
+            <MapPin size={20} /> {localMode ? "TURN OFF RADAR" : "SCAN LOCAL AREA"}
+          </button>
         </header>
 
         {loading ? (
-          <div className="text-4xl animate-pulse uppercase tracking-widest">Accessing Mainframe...</div>
+          <div className="text-4xl animate-pulse uppercase tracking-widest">Scanning Area...</div>
         ) : skills.length === 0 ? (
           <div className="border-8 border-black border-dashed p-16 text-center bg-gray-50">
-            <p className="text-3xl text-gray-400 uppercase italic">The Grid is currently empty.</p>
+            <p className="text-3xl text-gray-400 uppercase italic">
+              {localMode ? "No swappers found within 50km. The grid is dark." : "No skills found matching your search."}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -105,12 +182,20 @@ export default function Marketplace() {
                         {skill.profiles?.full_name?.split(' ')[0]}
                       </span>
                     </div>
-                    {/* NEW: STAR RATING BADGE */}
-                    <div className="flex items-center gap-1 text-[10px] uppercase font-black bg-gray-100 border-2 border-black px-1.5 py-0.5 w-max mt-1">
-                      <Star size={10} className="fill-yellow-400 text-yellow-400" /> 
-                      {skill.profiles?.rating_count > 0 
-                        ? `${skill.profiles?.avg_rating} (${skill.profiles?.rating_count})` 
-                        : 'NEW USER'}
+                    
+                    <div className="flex gap-2">
+                      <div className="flex items-center gap-1 text-[10px] uppercase font-black bg-gray-100 border-2 border-black px-1.5 py-0.5 w-max mt-1">
+                        <Star size={10} className="fill-yellow-400 text-yellow-400" /> 
+                        {skill.profiles?.rating_count > 0 
+                          ? `${skill.profiles?.avg_rating} (${skill.profiles?.rating_count})` 
+                          : 'NEW'}
+                      </div>
+                      
+                      {localMode && skill.distance !== undefined && (
+                        <div className="flex items-center gap-1 text-[10px] uppercase font-black bg-blue-100 border-2 border-black px-1.5 py-0.5 w-max mt-1 text-blue-800">
+                          <MapPin size={10} /> {Math.round(skill.distance)} KM AWAY
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button 

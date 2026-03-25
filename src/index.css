@@ -60,3 +60,18 @@
   transform: scaleX(1);
   transform-origin: bottom left;
 }
+
+/* SEARCH BAR CENTER-OUT ANIMATION */
+.search-expand {
+  /* Tailwind lime-300 hex color is #d9f99d */
+  background-image: linear-gradient(#d9f99d, #d9f99d); 
+  background-size: 0% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: white; /* Default state */
+  transition: background-size 0.3s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.search-expand:focus {
+  background-size: 100% 100%;
+}

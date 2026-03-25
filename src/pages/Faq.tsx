@@ -9,7 +9,7 @@ export default function Faq() {
       <div className="max-w-4xl mx-auto relative z-10">
         <header className="text-center mb-16">
           <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter mb-4 leading-none">
-            WTF IS <span className="text-yellow-400 italic">THIS?</span>
+            WHAT IS <span className="text-yellow-400 italic">THIS?</span>
           </h1>
           <p className="text-2xl bg-black text-white inline-block px-6 py-2 uppercase italic shadow-[4px_4px_0px_0px_rgba(163,230,53,1)]">
             Frequently Asked Questions
