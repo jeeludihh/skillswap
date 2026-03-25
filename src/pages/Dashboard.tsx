@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
-import { Coins, Zap, MessageCircle, Trash2, X, ArrowRight } from 'lucide-react';
+import { Coins, Zap, MessageCircle, Trash2, X, ArrowRight, AlertTriangle } from 'lucide-react';
 import BrutalistBackground from '../components/BrutalistBackground';
 
 export default function Dashboard() {
@@ -11,6 +11,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ title: '', description: '', category: 'Coding', credit_value: 1 });
+  
+  // NEW: State to track which skill is being deleted for the modal
+  const [skillToDelete, setSkillToDelete] = useState<number | null>(null);
+  
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,10 +68,22 @@ export default function Dashboard() {
     }
   };
 
-  const handleDeleteSkill = async (id: number) => {
-    if (!window.confirm("REMOVE FROM GRID?")) return;
-    await supabase.from('swaps').delete().eq('id', id);
-    setMySkills(mySkills.filter(s => s.id !== id));
+  // Triggered when clicking the Trash icon (Opens Modal)
+  const handleDeleteSkill = (id: number) => {
+    setSkillToDelete(id);
+  };
+
+  // Triggered when confirming inside the Modal
+  const confirmDelete = async () => {
+    if (!skillToDelete) return;
+    try {
+      await supabase.from('swaps').delete().eq('id', skillToDelete);
+      setMySkills(mySkills.filter(s => s.id !== skillToDelete));
+    } catch (err: any) {
+      console.error("Delete error:", err);
+    } finally {
+      setSkillToDelete(null); // Close modal
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center font-black text-4xl uppercase">Accessing Mainframe...</div>;
@@ -187,6 +203,7 @@ export default function Dashboard() {
                   <span className="bg-lime-400 border-2 border-black px-2 py-0.5 text-[10px] uppercase mb-2 inline-block">{skill.category}</span>
                   <h3 className="text-2xl uppercase leading-none">{skill.title}</h3>
                 </div>
+                {/* Changed onClick to trigger the modal instead of native confirm */}
                 <button onClick={() => handleDeleteSkill(skill.id)} className="bg-white border-4 border-black p-3 hover:bg-red-500 hover:text-white transition-colors">
                   <Trash2 size={24} />
                 </button>
@@ -196,6 +213,42 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* --- THE BRUTALIST DESTRUCTION MODAL --- */}
+      {skillToDelete !== null && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-white border-8 border-black p-8 md:p-12 max-w-md w-full shadow-[16px_16px_0px_0px_#ef4444] animate-brutal-in text-center flex flex-col items-center">
+            
+            <div className="w-16 h-16 bg-red-500 text-white border-4 border-black flex items-center justify-center rounded-full mb-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <AlertTriangle size={32} strokeWidth={3} />
+            </div>
+
+            <h2 className="text-4xl md:text-5xl font-black uppercase mb-4 leading-none tracking-tighter text-red-500">
+              Destroy Listing?
+            </h2>
+            
+            <p className="text-lg font-bold text-gray-600 uppercase mb-8">
+              This action is permanent. Your skill will be wiped from the grid forever.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 w-full">
+              <button 
+                onClick={() => setSkillToDelete(null)} 
+                className="flex-1 bg-white border-4 border-black py-4 font-black uppercase text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-gray-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete} 
+                className="flex-1 bg-red-500 text-white border-4 border-black py-4 font-black uppercase text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+              >
+                Destroy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

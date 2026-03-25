@@ -33,6 +33,7 @@ export default function Inbox() {
         // Show ALL incoming requests so you can access chat history later
         query = query.eq('receiver_id', user.id);
       } else {
+        // Show ALL outgoing requests
         query = query.eq('requester_id', user.id);
       }
 
@@ -130,6 +131,21 @@ export default function Inbox() {
                 <div className="flex-1">
                   <div className="mb-4 flex items-center gap-4 flex-wrap">
                     {/* STATUS BADGES & CHAT BUTTON */}
+                    
+                    {req.status === 'completed' && (
+                      <>
+                        <span className="bg-lime-400 border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                          <CheckCircle2 size={16}/> COMPLETED
+                        </span>
+                        <button 
+                          onClick={() => navigate(`/chat/${req.id}`)}
+                          className="bg-black text-white px-4 py-1 border-4 border-black text-sm font-black uppercase shadow-[2px_2px_0px_0px_#ec4899] hover:bg-pink-500 hover:text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+                        >
+                          CHAT
+                        </button>
+                      </>
+                    )}
+
                     {req.status === 'accepted' && (
                       <>
                         <span className="bg-lime-400 border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
@@ -139,10 +155,11 @@ export default function Inbox() {
                           onClick={() => navigate(`/chat/${req.id}`)}
                           className="bg-black text-white px-4 py-1 border-4 border-black text-sm font-black uppercase shadow-[2px_2px_0px_0px_#ec4899] hover:bg-pink-500 hover:text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
                         >
-                          CHAT &rarr;
+                          CHAT
                         </button>
                       </>
                     )}
+                    
                     {req.status === 'declined' && <span className="bg-red-400 text-white border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"><XCircle size={16}/> DECLINED</span>}
                     {req.status === 'pending' && <span className="bg-yellow-300 border-4 border-black px-3 py-1 text-sm font-black uppercase inline-flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"><Clock size={16}/> PENDING</span>}
                   </div>
