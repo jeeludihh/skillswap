@@ -1,40 +1,83 @@
 import { useEffect, useState } from 'react';
-import { User, LogOut, Mic } from 'lucide-react';
+import { User, LogOut, Bell, Mic } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', userId)
-      .single();
-    if (data) setProfile(data);
-  };
-
   useEffect(() => {
-    // Check initial session
+    // 1. Initial Session Check
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      if (currentUser) fetchProfile(currentUser.id);
+      if (currentUser) {
+        fetchProfile(currentUser.id);
+        fetchUnreadCount(currentUser.id);
+      }
     });
 
-    // Listen for Auth changes (Login/Logout)
+    // 2. Auth State Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      if (currentUser) fetchProfile(currentUser.id);
-      else setProfile(null);
+      if (currentUser) {
+        fetchProfile(currentUser.id);
+        fetchUnreadCount(currentUser.id);
+      } else {
+        setProfile(null);
+        setUnreadCount(0);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // REALTIME NOTIFICATION LISTENER
+  // REALTIME NOTIFICATION LISTENER
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('realtime_notifications')
+      .on('postgres_changes', 
+        // We removed the strict filter so it catches deletes/reads perfectly
+        { event: '*', schema: 'public', table: 'notifications' }, 
+        () => {
+          fetchUnreadCount(user.id);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  // INSTANT BADGE RESET LISTENER
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (user) fetchUnreadCount(user.id);
+    };
+    
+    window.addEventListener('notifications-updated', handleUpdate);
+    return () => window.removeEventListener('notifications-updated', handleUpdate);
+  }, [user]);
+
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase.from('profiles').select('full_name').eq('id', userId).single();
+    if (data) setProfile(data);
+  };
+
+  const fetchUnreadCount = async (userId: string) => {
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+    setUnreadCount(count || 0);
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -43,70 +86,81 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 w-full h-[80px] bg-yellow-300 border-b-4 border-black flex justify-between items-center px-6 z-50 shadow-[0px_4px_0px_0px_rgba(0,0,0,1)]">
-      {/* LEFT SECTION: LOGO & LINKS */}
+      {/* LEFT: LOGO */}
       <div className="flex items-center gap-8">
-        <Link to="/" className="group relative flex items-center">
-          <div className="bg-black text-white px-5 py-2 border-[4px] border-black shadow-[6px_6px_0px_0px_#ec4899] group-hover:shadow-none group-hover:translate-x-[6px] group-hover:translate-y-[6px] transition-all">
-            <span className="text-2xl font-black uppercase tracking-tighter italic leading-none">
-              SKILL<span className="text-yellow-300 font-black">SWAP</span>
+        <Link to="/" className="group">
+          <div className="bg-black text-white px-4 py-2 border-4 border-black shadow-[4px_4px_0px_0px_#ec4899] group-hover:translate-x-[2px] group-hover:translate-y-[2px] group-hover:shadow-none transition-all">
+            <span className="text-xl font-black uppercase italic tracking-tighter">
+              SKILL<span className="text-yellow-300">SWAP</span>
             </span>
           </div>
         </Link>
-        
-        <ul className="hidden lg:flex gap-6 text-black font-black uppercase text-sm tracking-tight italic">
+        <ul className="hidden md:flex gap-6 font-black uppercase italic text-sm">
           <li><Link to="/marketplace" className="hover:text-pink-600 transition-colors">The Grid</Link></li>
-          <li><Link to="/how-it-works" className="hover:text-pink-600 transition-colors">Manifesto</Link></li>
         </ul>
       </div>
 
-      {/* RIGHT SECTION: SEARCH & AUTH */}
-      <div className="flex items-center gap-4 md:gap-6">
-        {/* SEARCH BAR */}
-        <div className="relative hidden md:flex items-center group">
-          <input 
-            type="text" 
-            placeholder="SEARCH SKILLS..." 
-            className="pl-4 pr-10 py-2 border-4 border-black bg-white text-black font-black uppercase w-40 lg:w-60 focus:bg-lime-300 outline-none transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:shadow-none focus:translate-x-[2px] focus:translate-y-[2px]"
+      {/* RIGHT: SEARCH & AUTH ACTIONS */}
+      <div className="flex items-center gap-4">
+        {/* SEARCH (Non-functional visual for now) */}
+        <div className="relative hidden lg:flex items-center">
+          <input
+            type="text"
+            placeholder="SEARCH..."
+            className="pl-3 pr-8 py-1 border-4 border-black bg-white font-black uppercase text-xs w-40 focus:bg-lime-300 outline-none shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
           />
-          <Mic className="absolute right-3 text-black w-5 h-5 group-hover:text-pink-500 transition-colors" />
+          <Mic className="absolute right-2 w-4 h-4 text-black" />
         </div>
 
-        {/* USER ACTIONS */}
-        <div className="flex gap-3 items-center">
-          {!user ? (
-            <>
-              <Link to="/login" className="bg-white text-black border-4 border-black px-4 py-2 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all">
-                Sign In
-              </Link>
-              <Link to="/signup" className="bg-pink-500 text-white border-4 border-black px-4 py-2 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all">
-                Join Now
-              </Link>
-            </>
-          ) : (
-            <div className="flex items-center gap-3">
-              {/* USER PROFILE BOX */}
-              <Link 
-                to="/dashboard" 
-                className="flex items-center gap-3 bg-white border-4 border-black px-4 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
-              >
-                <div className="w-8 h-8 bg-lime-400 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                  <User size={18} strokeWidth={3} className="text-black" />
-                </div>
-                <span className="font-black uppercase text-sm tracking-tighter hidden sm:block">
-                  {profile?.full_name?.split(' ')[0] || 'GRID USER'}
+        {!user ? (
+          /* LOGGED OUT STATE */
+          <div className="flex gap-3">
+            <Link to="/login" className="bg-white border-4 border-black px-4 py-2 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-gray-100 transition-all">
+              Sign In
+            </Link>
+            <Link to="/signup" className="bg-pink-500 text-white border-4 border-black px-4 py-2 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all">
+              Join
+            </Link>
+          </div>
+        ) : (
+          /* LOGGED IN STATE */
+          <div className="flex items-center gap-3">
+            {/* NOTIFICATION BELL */}
+            <Link
+              to="/activity"
+              className="relative p-2 bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
+            >
+              <Bell size={22} fill={unreadCount > 0 ? "#ec4899" : "none"} className={unreadCount > 0 ? "animate-bounce" : ""} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-3 -right-3 bg-pink-500 text-white border-2 border-black px-1.5 text-[10px] font-black">
+                  {unreadCount}
                 </span>
-              </Link>
+              )}
+            </Link>
+            <Link
+              to="/inbox"
+              className="bg-white border-4 border-black px-3 py-2 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-lime-300 transition-all flex items-center gap-2"
+            >
+              Inbox
+            </Link>
+            {/* DASHBOARD LINK */}
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-2 bg-white border-4 border-black px-3 py-2 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
+            >
+              <User size={16} />
+              <span className="hidden sm:inline">{profile?.full_name?.split(' ')[0] || 'USER'}</span>
+            </Link>
 
-              {/* LOGOUT BUTTON */}
-              <button 
-                onClick={handleSignOut}
-                className="p-2 bg-pink-500 border-4 border-black text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
-              >
-                <LogOut size={20} strokeWidth={3} />
-              </button>
-            </div>
-          )}
-        </div>
+            {/* LOGOUT */}
+            <button
+              onClick={handleSignOut}
+              className="p-2 bg-black text-white border-4 border-black shadow-[4px_4px_0px_0px_#ec4899] hover:bg-pink-600 transition-colors"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </nav>
   );
