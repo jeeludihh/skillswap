@@ -9,30 +9,42 @@ export default function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
 
+  // --- UPDATED LOGIC: BULLETPROOF AUTH LISTENER ---
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        fetchProfile(currentUser.id);
-        fetchUnreadCount(currentUser.id);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        fetchProfile(currentUser.id);
-        fetchUnreadCount(currentUser.id);
+    // 1. Instantly check current state on load
+    const checkUser = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session) {
+        setUser(null);
+        setProfile(null);
+        setUnreadCount(0);
       } else {
+        setUser(session.user);
+        fetchProfile(session.user.id);
+        fetchUnreadCount(session.user.id);
+      }
+    };
+    
+    checkUser();
+
+    // 2. Live radar for any auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        fetchProfile(session.user.id);
+        fetchUnreadCount(session.user.id);
+      } else {
+        setUser(null); // Explicitly kill state
         setProfile(null);
         setUnreadCount(0);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+  // ------------------------------------------------
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -74,10 +86,15 @@ export default function Navbar() {
     setUnreadCount(count || 0);
   };
 
+  // --- UPDATED LOGIC: INSTANT STATE WIPE ---
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    setUser(null); // Instantly wipe local state so UI updates immediately
+    setProfile(null);
+    setUnreadCount(0);
     navigate('/');
   };
+  // -----------------------------------------
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
